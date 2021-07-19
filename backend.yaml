@@ -1,0 +1,127 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: backend
+  namespace: envoy-dashboard
+data:
+  envoy.yaml: |
+    admin:
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 9901
+    static_resources:
+      listeners:
+      - name: listener_0
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: 10000
+        filter_chains:
+        - filters:
+          - name: envoy.filters.network.http_connection_manager
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+              stat_prefix: ingress_http
+              access_log:
+              - name: envoy.access_loggers.stdout
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+              http_filters:
+              - name: envoy.filters.http.fault
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault
+                  abort:
+                    http_status: 503
+                    percentage:
+                      numerator: 10
+                      denominator: HUNDRED              
+              - name: envoy.filters.http.router
+              route_config:
+                name: local_route
+                virtual_hosts:
+                - name: local_service
+                  domains: ["*"]
+                  routes:
+                  - match:
+                      prefix: "/"
+                    route:                      
+                      cluster: backend
+      clusters:
+      - name: backend
+        type: LOGICAL_DNS
+        dns_lookup_family: V4_ONLY
+        load_assignment:
+          cluster_name: backend
+          endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: httpbin.org
+                    port_value: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: backend
+  name: backend
+  namespace: envoy-dashboard
+spec:
+  ports:
+  - name: admin-http
+    port: 9901
+    protocol: TCP
+    targetPort: 9901
+  - name: http
+    port: 10000
+    protocol: TCP
+    targetPort: 10000
+  selector:
+    app: backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:  
+  labels:
+    app: backend
+  name: backend
+  namespace: envoy-dashboard  
+spec:
+  replicas: 1  
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:      
+      - image: envoyproxy/envoy:v1.19-latest
+        args: [-c, /etc/envoy.yaml]
+        imagePullPolicy: Always
+        name: envoy
+        ports:
+        - containerPort: 9901
+          name: admin-http
+          protocol: TCP
+        - containerPort: 10000
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /etc/envoy.yaml
+          name: backend
+          subPath: envoy.yaml
+      volumes:      
+      - configMap:
+          items:
+          - key: envoy.yaml
+            path: envoy.yaml
+          name: backend
+        name: backend

@@ -1,0 +1,965 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: prometheus
+  namespace: envoy-dashboard
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s 
+      evaluation_interval: 15s   
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+        - targets: [localhost:9090]
+      - job_name: proxy
+        scrape_interval: 1s 
+        metrics_path: stats/prometheus        
+        static_configs:
+        - targets: [proxy:9901]        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus
+  namespace: envoy-dashboard
+spec:
+  ports:
+  - name: http
+    port: 9090
+    protocol: TCP
+    targetPort: 9090  
+  selector:
+    app: prometheus
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:  
+  labels:
+    app: prometheus    
+  name: prometheus
+  namespace: envoy-dashboard  
+spec:
+  replicas: 1  
+  selector:
+    matchLabels:
+      app: prometheus      
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: prometheus        
+    spec:
+      containers:      
+      - image: prom/prometheus 
+        imagePullPolicy: Always
+        name: prometheus
+        ports:        
+        - containerPort: 9090
+          name: http
+          protocol: TCP            
+        volumeMounts:
+        - mountPath: /etc/prometheus/prometheus.yml
+          name: prometheus
+          subPath: prometheus.yml
+      volumes:
+      - configMap:
+          items:
+          - key: prometheus.yml
+            path: prometheus.yml
+          name: prometheus
+        name: prometheus
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: grafana
+  namespace: envoy-dashboard
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        access: proxy
+        type: prometheus
+        orgId: 1
+        url: http://prometheus:9090
+        isDefault: true
+        editable: false
+  dashboard.yml: |
+    apiVersion: 1
+    providers:
+      - name: Envoy    
+        orgId: 1    
+        type: file    
+        disableDeletion: false    
+        updateIntervalSeconds: 10    
+        allowUiUpdates: false
+        options:      
+          path: /var/lib/grafana/dashboards
+  dashboard.json: |
+    {
+    "annotations": {
+        "list": [
+        {
+            "builtIn": 1,
+            "datasource": "-- Grafana --",
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+        }
+        ]
+    },
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "iteration": 1626612081298,
+    "links": [],
+    "panels": [
+        {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+        },
+        "id": 20,
+        "panels": [],
+        "title": "Circuit Breaking",
+        "type": "row"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 0,
+            "y": 1
+        },
+        "id": 22,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_circuit_breakers_default_cx_open{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Connections Circuit Breaker Status",
+        "type": "timeseries"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 12,
+            "y": 1
+        },
+        "id": 28,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_circuit_breakers_default_remaining_cx{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Remaining Connections",
+        "type": "timeseries"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 0,
+            "y": 5
+        },
+        "id": 24,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_circuit_breakers_default_rq_open{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Requests Circuit Breaker Status",
+        "type": "timeseries"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": [
+            {
+                "__systemRef": "hideSeriesFrom",
+                "matcher": {
+                "id": "byNames",
+                "options": {
+                    "mode": "exclude",
+                    "names": [
+                    "envoy_cluster_circuit_breakers_default_remaining_rq{envoy_cluster_name=\"backend\", instance=\"proxy:9901\", job=\"proxy\"}"
+                    ],
+                    "prefix": "All except:",
+                    "readOnly": true
+                }
+                },
+                "properties": [
+                {
+                    "id": "custom.hideFrom",
+                    "value": {
+                    "legend": false,
+                    "tooltip": false,
+                    "viz": true
+                    }
+                }
+                ]
+            }
+            ]
+        },
+        "gridPos": {
+            "h": 4,
+            "w": 12,
+            "x": 12,
+            "y": 5
+        },
+        "id": 26,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_circuit_breakers_default_remaining_rq{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Remaining Requests",
+        "type": "timeseries"
+        },
+        {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 9
+        },
+        "id": 14,
+        "panels": [],
+        "title": "Outlier Detection",
+        "type": "row"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineStyle": {
+                "fill": "solid"
+                },
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "red",
+                    "value": null
+                }
+                ]
+            }
+            },
+            "overrides": [
+            {
+                "matcher": {
+                "id": "byName",
+                "options": "envoy_cluster_outlier_detection_ejections_active{envoy_cluster_name=\"backend\", instance=\"proxy:9901\", job=\"proxy\"}"
+                },
+                "properties": [
+                {
+                    "id": "color",
+                    "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                    }
+                }
+                ]
+            }
+            ]
+        },
+        "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 10
+        },
+        "id": 16,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_outlier_detection_ejections_active{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Endpoints Ejected",
+        "type": "timeseries"
+        },
+        {
+        "datasource": null,
+        "description": "",
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "red",
+                    "value": null
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 10
+        },
+        "id": 2,
+        "options": {
+            "reduceOptions": {
+            "calcs": [
+                "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+        },
+        "pluginVersion": "8.0.6",
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_outlier_detection_ejections_active{envoy_cluster_name=\"backend\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Endpoints Ejected",
+        "type": "gauge"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 10,
+            "w": 6,
+            "x": 18,
+            "y": 10
+        },
+        "id": 10,
+        "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+            "calcs": [
+                "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+            },
+            "text": {},
+            "textMode": "auto"
+        },
+        "pluginVersion": "8.0.6",
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_membership_total{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Endpoints Total",
+        "type": "stat"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "palette-classic"
+            },
+            "custom": {
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+                },
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                "type": "linear"
+                },
+                "showPoints": "never",
+                "spanNulls": false,
+                "stacking": {
+                "group": "A",
+                "mode": "none"
+                },
+                "thresholdsStyle": {
+                "mode": "off"
+                }
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 15
+        },
+        "id": 18,
+        "options": {
+            "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+            },
+            "tooltip": {
+            "mode": "single"
+            }
+        },
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_membership_total{envoy_cluster_name=~\"$cluster\"} - envoy_cluster_outlier_detection_ejections_active{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Endpoints Active",
+        "type": "timeseries"
+        },
+        {
+        "datasource": null,
+        "fieldConfig": {
+            "defaults": {
+            "color": {
+                "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                {
+                    "color": "green",
+                    "value": null
+                },
+                {
+                    "color": "red",
+                    "value": 80
+                }
+                ]
+            }
+            },
+            "overrides": []
+        },
+        "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 12,
+            "y": 15
+        },
+        "id": 12,
+        "options": {
+            "reduceOptions": {
+            "calcs": [
+                "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+            },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true,
+            "text": {}
+        },
+        "pluginVersion": "8.0.6",
+        "targets": [
+            {
+            "exemplar": true,
+            "expr": "envoy_cluster_membership_total{envoy_cluster_name=~\"$cluster\"} - envoy_cluster_outlier_detection_ejections_active{envoy_cluster_name=~\"$cluster\"}",
+            "interval": "",
+            "legendFormat": "",
+            "refId": "A"
+            }
+        ],
+        "title": "Endpoints Active",
+        "type": "gauge"
+        }
+    ],
+    "refresh": "",
+    "schemaVersion": 30,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+        "list": [
+        {
+            "allValue": null,
+            "current": {
+            "selected": false,
+            "text": "backend",
+            "value": "backend"
+            },
+            "datasource": null,
+            "definition": "label_values(envoy_cluster_name)",
+            "description": null,
+            "error": null,
+            "hide": 0,
+            "includeAll": false,
+            "label": "Cluster",
+            "multi": false,
+            "name": "cluster",
+            "options": [],
+            "query": {
+            "query": "label_values(envoy_cluster_name)",
+            "refId": "StandardVariableQuery"
+            },
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
+        }
+        ]
+    },
+    "time": {
+        "from": "now-5m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Envoy",
+    "uid": "_Nllvui7z",
+    "version": 1
+    }           
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: grafana
+  name: grafana
+  namespace: envoy-dashboard
+spec:
+  ports:
+  - name: http
+    port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: grafana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:  
+  labels:
+    app: grafana    
+  name: grafana
+  namespace: envoy-dashboard  
+spec:
+  replicas: 1  
+  selector:
+    matchLabels:
+      app: grafana      
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: grafana        
+    spec:
+      containers:      
+      - image: grafana/grafana 
+        imagePullPolicy: Always
+        name: grafana
+        ports:        
+        - containerPort: 3000
+          name: http
+          protocol: TCP        
+        volumeMounts:
+        - mountPath: /etc/grafana/provisioning/datasources/datasource.yml
+          name: datasource-config
+          subPath: datasource.yml
+        - mountPath: /etc/grafana/provisioning/dashboards/dashboard.yml
+          name: dashboard-config
+          subPath: dashboard.yml
+        - mountPath: /var/lib/grafana/dashboards/dashboard.json
+          name: dashboard
+          subPath: dashboard.json
+      volumes:      
+      - configMap:
+          items:
+          - key: datasource.yml
+            path: datasource.yml
+          name: grafana
+        name: datasource-config
+      - configMap:
+          items:
+          - key: dashboard.yml
+            path: dashboard.yml
+          name: grafana
+        name: dashboard-config
+      - configMap:
+          items:
+          - key: dashboard.json
+            path: dashboard.json
+          name: grafana
+        name: dashboard
