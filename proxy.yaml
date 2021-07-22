@@ -53,6 +53,7 @@ data:
             - priority: DEFAULT
               max_connections: 10
               max_requests: 5
+              max_pending_requests: 1
               track_remaining: true               
         outlier_detection:
           consecutive_5xx: 5
